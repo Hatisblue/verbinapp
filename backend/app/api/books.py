@@ -369,3 +369,50 @@ async def check_if_liked(
     like = result.scalar_one_or_none()
 
     return {"liked": like is not None}
+
+# Export endpoints
+from fastapi.responses import Response
+from app.services.export_service import export_service
+
+@router.get("/{book_id}/export/pdf")
+async def export_book_to_pdf(
+    book_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Export book to PDF"""
+    book = await BookService.get_book(db, book_id, include_chapters=True)
+    if not book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+
+    # Prepare book data
+    book_data = {
+        "title": book.title,
+        "description": book.description,
+        "chapters": [
+            {
+                "number": chapter.chapter_number,
+                "title": chapter.title,
+                "blocks": [
+                    {"block_type": block.block_type.value, "content": block.content}
+                    for block in chapter.blocks
+                ]
+            }
+            for chapter in book.chapters
+        ]
+    }
+
+    pdf_bytes = export_service.export_to_pdf(book_data)
+    return Response(content=pdf_bytes, media_type="application/pdf",
+                    headers={"Content-Disposition": f"attachment; filename={book.title}.pdf"})
+
+
+@router.get("/{book_id}/export/epub")
+async def export_book_to_epub(
+    book_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Export book to ePub"""
+    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                        detail="ePub export coming soon")
