@@ -11,7 +11,7 @@ from app.middleware.error_handler import error_handler_middleware
 from app.middleware.auth_middleware import AuthMiddleware
 from app.db.database import engine, Base
 from app.utils.logger import setup_logging
-from app.api import auth, books, users, comments, payments, admin, notifications, recommendations, challenges
+from app.api import auth, books, users, comments, payments, admin, notifications, recommendations, challenges, chapters
 
 # Setup logging
 setup_logging()
@@ -66,6 +66,7 @@ app.add_middleware(AuthMiddleware)
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(books.router, prefix="/api/books", tags=["Books"])
+app.include_router(chapters.router, prefix="/api", tags=["Chapters & Blocks"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(comments.router, prefix="/api/comments", tags=["Comments"])
 app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])

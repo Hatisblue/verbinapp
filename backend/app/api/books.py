@@ -284,3 +284,88 @@ async def generate_book(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate book"
         )
+
+
+# Like endpoints
+@router.post("/{book_id}/like", status_code=status.HTTP_201_CREATED)
+async def like_book(
+    book_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Like a book"""
+    from app.models.like import Like
+    from sqlalchemy import select
+
+    # Check if book exists
+    book = await BookService.get_book(db, book_id)
+    if not book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+
+    # Check if already liked
+    result = await db.execute(
+        select(Like).where(Like.user_id == current_user.id, Like.book_id == book_id)
+    )
+    existing_like = result.scalar_one_or_none()
+
+    if existing_like:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Already liked")
+
+    # Create like
+    like = Like(user_id=current_user.id, book_id=book_id)
+    db.add(like)
+    book.likes_count += 1
+    await db.commit()
+
+    return {"message": "Book liked successfully", "likes_count": book.likes_count}
+
+
+@router.delete("/{book_id}/like", status_code=status.HTTP_200_OK)
+async def unlike_book(
+    book_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Unlike a book"""
+    from app.models.like import Like
+    from sqlalchemy import select
+
+    # Check if book exists
+    book = await BookService.get_book(db, book_id)
+    if not book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+
+    # Check if liked
+    result = await db.execute(
+        select(Like).where(Like.user_id == current_user.id, Like.book_id == book_id)
+    )
+    like = result.scalar_one_or_none()
+
+    if not like:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not liked yet")
+
+    # Remove like
+    await db.delete(like)
+    if book.likes_count > 0:
+        book.likes_count -= 1
+    await db.commit()
+
+    return {"message": "Book unliked successfully", "likes_count": book.likes_count}
+
+
+@router.get("/{book_id}/liked", status_code=status.HTTP_200_OK)
+async def check_if_liked(
+    book_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Check if current user liked the book"""
+    from app.models.like import Like
+    from sqlalchemy import select
+
+    result = await db.execute(
+        select(Like).where(Like.user_id == current_user.id, Like.book_id == book_id)
+    )
+    like = result.scalar_one_or_none()
+
+    return {"liked": like is not None}
